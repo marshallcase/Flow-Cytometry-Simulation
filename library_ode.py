@@ -86,7 +86,7 @@ def fitToExperiment(exp_x,exp_y):
     fit_kd = x[np.argmin(np.abs(y-0.5))]
     plt.plot([fit_kd,fit_kd],[0,0.5],linestyle='--',color='tab:blue')
     plt.plot([min(x),x[np.argmin(np.abs(y-0.5))]],[0.5,0.5],color='tab:blue',linestyle='--')
-    plt.text(x[np.argmin(np.abs(y-0.96))],y[np.argmin(np.abs(y-0.4))],s='fit Kd: ' +str(np.around(fit_kd,9)))
+    plt.text(x[np.argmin(np.abs(y-0.96))],y[np.argmin(np.abs(y-0.4))],s='fit IC50: ' +str(np.around(fit_kd,9)))
     plt.xlim([x[0]*0.5,x[-1]*1.5])
     plt.ylim([-0.1,1.1])
     return fit_kd
@@ -152,11 +152,33 @@ def plotKd(kon1,koff1,kon2,koff2,peptide_concs,BSD_conc,mcl1_conc,toPlot=True):
         #set up axes and label Kd on graph
         plt.plot([fit_kd,fit_kd],[0,0.5],linestyle='--',color='tab:blue')
         plt.plot([min(curve_fit_x),curve_fit_x[np.argmin(np.abs(y-0.5))]],[0.5,0.5],color='tab:blue',linestyle='--')
-        plt.text(curve_fit_x[np.argmin(np.abs(y-0.96))],y[np.argmin(np.abs(y-0.4))],s='fit Kd: ' +str(np.around(fit_kd,9)))
+        plt.text(curve_fit_x[np.argmin(np.abs(y-0.96))],y[np.argmin(np.abs(y-0.4))],s='fit IC50: ' +str(np.around(fit_kd,9)))
         plt.xlim([curve_fit_x[0]*0.5,curve_fit_x[-1]*1.5])
         plt.ylim([-0.1,1.1])
         
     return fit_kd
+
+def getKiFromIC50(f0,Kd_BSD,BSD_conc,IC50):
+    '''
+
+    Parameters
+    ----------
+    f0 : float
+        fraction bound. At IC50, f0=0.5.
+    Kd_BSD : float
+        Kd of the BSD peptide-protein interaction. Ususally around 1nM.
+    BSD_conc : float
+        Concentration of BSD peptide. Usually 1e10/(6.023e23*25e-6)
+    IC50 : float
+        fit IC50
+
+    Returns
+    -------
+    Ki: float
+        concentration of inhibtor for 50% inhibition 
+
+    '''
+    return (IC50/((f0*Kd_BSD)/(1-f0)/(2-f0)+f0*BSD_conc/(2-f0))-1)*Kd_BSD*f0/(2-f0)
 #rate constants
 
 
@@ -218,6 +240,7 @@ mcl1_conc = 1e-8
 BSD_conc = 1e10/(6.022e23*25e-6)
 
 #display level sensitivity analysis
+plt.figure()
 plt.scatter(np.logspace(8,13,6),[plotKd(kon1,koff1,kon2,koff2,peptide_concs,d_l/6.022e23/25e-6,mcl1_conc,toPlot=False) for d_l in np.logspace(8,13,6)])
 plt.xscale('log')
 plt.yscale('log')
@@ -225,6 +248,7 @@ plt.xlabel('# of peptides displayed on bacteria')
 plt.ylabel('fit Kd')
 
 #mcl1 concentration sensitivity analysis
+plt.figure()
 plt.scatter(np.logspace(-12,-6,10),[plotKd(kon1,koff1,kon2,koff2,peptide_concs,BSD_conc,mc,toPlot=False) for mc in np.logspace(-12,-6,10)])
 plt.xscale('log')
 plt.yscale('log')
@@ -232,6 +256,7 @@ plt.xlabel('Mcl-1 conc [M]')
 plt.ylabel('fit Kd')
 
 #bsd affinity sensitivity analysis
+plt.figure()
 plt.scatter(np.logspace(-6,-1,12),[plotKd(kon1,koff1,kon2,k2,peptide_concs,BSD_conc,mcl1_conc,toPlot=False) for k2 in np.logspace(-6,-1,12)])
 plt.xscale('log')
 plt.yscale('log')
