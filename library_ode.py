@@ -40,7 +40,7 @@ def plot(kon1,koff1,kon2,koff2,L_0,P1_0,P2_0,LP1_0,LP2_0,plots=[],labels=[],figu
         t_0: default 0 (seconds)
         t_end: t | t=end, default 3600*5
         n: number of points, default 1000
-        toPlot: plots if True
+        ax: substitute ax object for plotting in subplots, defaults to None (create new plot)
     Outputs:
         L at t=end
         P1 at t=end
@@ -76,6 +76,7 @@ def plot(kon1,koff1,kon2,koff2,L_0,P1_0,P2_0,LP1_0,LP2_0,plots=[],labels=[],figu
                 plt.title('Kd,BSD: ' + str(Kd_BSD) + ', Kd,solution: ' + str(Kd_solution))
                 plt.ylim([1e-13,5e-6])
                 plt.ylabel('Concentration [M]')
+                plt.xlabel('Time (sec)')
             
         return res.y.T[-1,0],res.y.T[-1,1],res.y.T[-1,2],res.y.T[-1,3],res.y.T[-1,4]
     else:
@@ -104,6 +105,7 @@ def plot(kon1,koff1,kon2,koff2,L_0,P1_0,P2_0,LP1_0,LP2_0,plots=[],labels=[],figu
                 ax.set_title('Kd,BSD: ' + str(Kd_BSD) + ', Kd,solution: ' + str(Kd_solution))
                 ax.set_ylim([1e-13,5e-6])
                 ax.set_ylabel('Concentration [M]')
+                ax.set_xlabel('Time (sec)')
         return res.y.T[-1,0],res.y.T[-1,1],res.y.T[-1,2],res.y.T[-1,3],res.y.T[-1,4],ax
 
     
@@ -114,32 +116,51 @@ def sigmoid(t,a,b,c):
 def sigmoid2(x,top,bottom,kd):
     return bottom + x*(top-bottom)/(kd+x)
 
-def fitToExperiment(exp_x,exp_y):
+def fitToExperiment(exp_x,exp_y,ax=None):
     '''
     Inputs:
         exp_x: concentrations of experimental data
         exp_y: % block of experimental data
+        ax: substitute ax object for plotting in subplots, defaults to None (create new plot)
     Outputs:
         fit_kd: fit Kd
     '''
-    plt.figure()
     top = 0
     bottom = 1
     popt, pcov = curve_fit(lambda x,kd: sigmoid2(x,top,bottom,kd), exp_x, exp_y,method='trf')
-    plt.scatter(exp_x,exp_y,label='exp')
-    plt.xscale('log')
     n_points = 8
     x = np.logspace(np.log10(min(exp_x)),np.log10(max(exp_x)*10),n_points*100)
     y=sigmoid2(x,top,bottom,popt[0])
-    plt.plot(x,y,label='exp fit')
-    plt.legend()
     fit_kd = x[np.argmin(np.abs(y-0.5))]
-    plt.plot([fit_kd,fit_kd],[0,0.5],linestyle='--',color='tab:blue')
-    plt.plot([min(x),x[np.argmin(np.abs(y-0.5))]],[0.5,0.5],color='tab:blue',linestyle='--')
-    plt.text(x[np.argmin(np.abs(y-0.96))],y[np.argmin(np.abs(y-0.4))],s='fit IC50: ' +str(np.around(fit_kd,9)))
-    plt.xlim([x[0]*0.5,x[-1]*1.5])
-    plt.ylim([-0.1,1.1])
-    return fit_kd
+
+    if ax is None:
+        plt.figure()
+        plt.scatter(exp_x,exp_y,label='exp')
+        plt.xscale('log')
+        plt.plot(x,y,label='exp fit')
+        plt.legend()
+        plt.plot([fit_kd,fit_kd],[0,0.5],linestyle='--',color='tab:blue')
+        plt.plot([min(x),x[np.argmin(np.abs(y-0.5))]],[0.5,0.5],color='tab:blue',linestyle='--')
+        plt.text(x[np.argmin(np.abs(y-0.96))],y[np.argmin(np.abs(y-0.4))],s='fit IC50: ' +str(np.around(fit_kd,9)))
+        plt.xlim([x[0]*0.5,x[-1]*1.5])
+        plt.ylim([-0.2,1.2])
+        plt.xlabel('Fraction Blocked')
+        plt.ylabel('Concentration [M]')
+        return fit_kd
+        
+    else:
+        ax.scatter(exp_x,exp_y,label='exp')
+        ax.set_xscale('log')
+        ax.plot(x,y,label='exp fit')
+        ax.legend()
+        ax.plot([fit_kd,fit_kd],[0,0.5],linestyle='--',color='tab:blue')
+        ax.plot([min(x),x[np.argmin(np.abs(y-0.5))]],[0.5,0.5],color='tab:blue',linestyle='--')
+        ax.text(x[np.argmin(np.abs(y-0.96))],y[np.argmin(np.abs(y-0.4))],s='fit IC50: ' +str(np.around(fit_kd,9)))
+        ax.set_xlim([x[0]*0.5,x[-1]*1.5])
+        ax.set_ylim([-0.2,1.2])
+        ax.set_xlabel('Fraction Blocked')
+        ax.set_ylabel('Concentration [M]')
+        return fit_kd, ax
 
 def plotKd(kon1,koff1,kon2,koff2,peptide_concs,BSD_conc,mcl1_conc,ax=None):
     '''
@@ -151,14 +172,13 @@ def plotKd(kon1,koff1,kon2,koff2,peptide_concs,BSD_conc,mcl1_conc,ax=None):
         peptide_concs
         BSD_conc
         mcl1_conc
-        toPlot: plot if True
-    
+        ax: substitute ax object for plotting in subplots, defaults to None (create new plot)
     Outputs:
         fit_kd: fit Kd
     '''
     #get phase 1 concentrations (blocking phase) based on peptide concentrations
     y1 = np.hstack([plot(kon1,koff1,kon2,koff2,mcl1_conc,peptide_conc,0,0,0) for peptide_conc in peptide_concs])
-    y1 = np.reshape(y1,(8,5))
+    y1 = np.reshape(y1,(len(peptide_concs),5))
     L_1 = y1[:,0]
     P1_1 = y1[:,1]
     P2_1 = y1[:,2]
@@ -168,7 +188,7 @@ def plotKd(kon1,koff1,kon2,koff2,peptide_concs,BSD_conc,mcl1_conc,ax=None):
     #get BSD-peptide-mcl1 concentrations (phase 2)
     PL2 = [plot(kon1,koff1,kon2,koff2,L,P1,BSD_conc,LP1,LP2) for L,P1,P2,LP1,LP2 in zip(L_1,P1_1,P2_1,LP1_1,LP2_1)]
     PL2 = np.hstack(PL2)
-    PL2 = np.reshape(PL2,(8,5))
+    PL2 = np.reshape(PL2,(len(peptide_concs),5))
     PL2 = PL2[:,4]
     PL2 = PL2/max(PL2)
     
@@ -245,6 +265,6 @@ def getKiFromIC50(f0,Kd_BSD,BSD_conc,IC50):
         concentration of inhibtor for 50% inhibition 
 
     '''
-    return (IC50/((f0*Kd_BSD)/(1-f0)/(2-f0)+f0*BSD_conc/(2-f0))-1)*Kd_BSD*f0/(2-f0)
+    return (IC50/((f0*Kd_BSD)/(1-f0)/(2-f0)+f0*BSD_conc/2)-1)*Kd_BSD*f0/(2-f0)
 
 
